@@ -199,17 +199,17 @@ input:focus,select:focus,textarea:focus{outline:none}
 @media(min-width:768px){.fab{bottom:40px;right:40px}}
 
 /* ───── Sheet modal ───── */
-.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:40;display:none;align-items:flex-end;justify-content:center;animation:fadeIn .2s var(--ease)}
+.sheet-bg{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:40;display:none;align-items:flex-end;justify-content:center;animation:fadeIn .2s var(--ease)}
 .sheet-bg.open{display:flex}
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
-.sheet{background:rgba(12,12,18,.96);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-radius:22px 22px 0 0;border-top:1px solid rgba(0,200,255,.15);width:100%;max-width:430px;padding:0 0 40px;animation:slideUp .3s var(--ease);max-height:92vh;overflow-y:auto;scrollbar-width:none}
+.sheet{background:rgba(12,12,18,.96);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-radius:22px 22px 0 0;border-top:1px solid rgba(0,200,255,.15);width:100vw;max-width:100vw;padding:0 0 40px;animation:slideUp .3s var(--ease);max-height:92svh;overflow-y:auto;scrollbar-width:none}
 .sheet::-webkit-scrollbar{display:none}
 @keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
 .sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--bg4);margin:10px auto 0}
 .sheet-head{display:flex;align-items:center;justify-content:space-between;padding:14px 20px 6px}
 .sheet-head h2{font-size:17px;font-weight:600;letter-spacing:-.02em}
 .sheet-close{font-size:15px;font-weight:600;color:var(--blue)}
-.sheet-body{padding:8px 20px 0;display:flex;flex-direction:column;gap:0}
+.sheet-body{padding:8px 20px 0;display:flex;flex-direction:column;gap:0;padding-bottom:env(safe-area-inset-bottom)}
 
 /* iOS-style form groups */
 .form-section{background:rgba(17,17,24,.9);border-radius:var(--r);overflow:hidden;margin-bottom:12px;border:1px solid rgba(0,200,255,.1)}
@@ -231,7 +231,7 @@ input:focus,select:focus,textarea:focus{outline:none}
 .save-btn:disabled{opacity:.4;pointer-events:none}
 
 /* ───── Confirm sheet ───── */
-.confirm-sheet{background:rgba(12,12,18,.96);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-radius:22px 22px 0 0;border-top:1px solid rgba(0,200,255,.15);width:100%;max-width:430px;padding:0 20px 40px;animation:slideUp .3s var(--ease)}
+.confirm-sheet{background:rgba(12,12,18,.96);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-radius:22px 22px 0 0;border-top:1px solid rgba(0,200,255,.15);width:100vw;max-width:100vw;padding:0 20px 40px;animation:slideUp .3s var(--ease)}
 .cs-title{font-size:17px;font-weight:600;text-align:center;padding:20px 0 6px;letter-spacing:-.01em}
 .cs-sub{font-size:14px;color:var(--txt4);text-align:center;margin-bottom:20px;line-height:1.4}
 .cs-btn{display:block;width:100%;padding:14px;font-size:17px;font-weight:600;border-radius:var(--r);margin-bottom:10px;letter-spacing:-.01em;transition:opacity .15s,transform .1s}
@@ -733,8 +733,27 @@ $('cs-del').addEventListener('click',()=>{ if(deleteId){ deleteTask(deleteId); d
 $('cs-cancel').addEventListener('click',()=>closeSheet('confirmSheet'));
 
 // ── Sheet helpers ──
-function openSheet(id){ $(id).classList.add('open'); document.body.style.overflow='hidden'; }
-function closeSheet(id){ $(id).classList.remove('open'); document.body.style.overflow=''; }
+let _scrollY = 0;
+function openSheet(id){
+  $(id).classList.add('open');
+  // Guardar posición de scroll y fijar el app para que no se mueva
+  _scrollY = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${_scrollY}px`;
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.style.overflow = 'hidden';
+}
+function closeSheet(id){
+  $(id).classList.remove('open');
+  // Restaurar posición exacta
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.overflow = '';
+  window.scrollTo(0, _scrollY);
+}
 document.querySelectorAll('.sheet-bg').forEach(bg=>{
   bg.addEventListener('click',e=>{ if(e.target===bg) closeSheet(bg.id); });
 });
