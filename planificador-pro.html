@@ -71,11 +71,7 @@ input:focus,select:focus,textarea:focus{outline:none}
   .app-inner{display:grid;grid-template-columns:300px 1fr;height:100vh;max-width:1024px;margin:0 auto}
 }
 
-/* ───── Status bar (iOS sim) ───── */
-.status{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 20px;font-size:15px;font-weight:600;letter-spacing:-.02em;flex-shrink:0}
-.status-time{font-variant-numeric:tabular-nums}
-.status-icons{display:flex;gap:6px;align-items:center}
-.status-icons svg{width:16px;height:16px;fill:var(--txt)}
+
 
 /* ───── Header ───── */
 .header{padding:4px 20px 12px;position:sticky;top:0;z-index:20;background:rgba(10,10,15,.82);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border-bottom:1px solid rgba(0,200,255,.08)}
@@ -258,9 +254,9 @@ input:focus,select:focus,textarea:focus{outline:none}
 /* ───── Resumen header cards ───── */
 .summary{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:4px 12px 8px;overflow:visible}
 .summary::-webkit-scrollbar{display:none}
-.sum-card{background:rgba(0,200,255,.06);border:1px solid rgba(0,200,255,.1);border-radius:10px;padding:7px 4px 6px;text-align:center;min-width:0}
-.sum-card .sc-val{font-size:17px;font-weight:700;letter-spacing:-.02em;line-height:1}
-.sum-card .sc-lbl{font-size:9px;color:var(--txt4);margin-top:3px;font-weight:500;text-transform:uppercase;letter-spacing:.03em;line-height:1.1}
+.sum-card{background:rgba(0,200,255,.06);border:1px solid rgba(0,200,255,.1);border-radius:10px;padding:7px 3px 6px;text-align:center;min-width:0;overflow:hidden}
+.sum-card .sc-val{font-size:16px;font-weight:700;letter-spacing:-.02em;line-height:1}
+.sum-card .sc-lbl{font-size:8px;color:var(--txt4);margin-top:3px;font-weight:500;text-transform:uppercase;letter-spacing:.02em;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;width:100%}
 .sc-blue{color:var(--blue)}
 .sc-green{color:var(--green)}
 .sc-orange{color:var(--orange)}
@@ -277,15 +273,6 @@ input:focus,select:focus,textarea:focus{outline:none}
 </head>
 <body>
 <div class="app" id="app">
-
-  <!-- Status bar -->
-  <div class="status">
-    <span class="status-time" id="stTime">9:41</span>
-    <div class="status-icons">
-      <svg viewBox="0 0 24 24"><path d="M1.5 8.5C5.2 4.8 10.4 3 12 3s6.8 1.8 10.5 5.5M5 12c1.9-1.9 4.3-3 7-3s5.1 1.1 7 3M8.5 15.5c.9-.9 2.2-1.5 3.5-1.5s2.6.6 3.5 1.5M12 19h.01"/></svg>
-      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="16" height="11" rx="2" ry="2"/><path d="M22 11v3"/></svg>
-    </div>
-  </div>
 
   <!-- Header -->
   <div class="header" id="header">
@@ -309,24 +296,25 @@ input:focus,select:focus,textarea:focus{outline:none}
   <!-- Área de scroll -->
   <div class="scroll" id="scroll"></div>
 
-  <!-- FAB -->
   <!-- Banner alerta in-app -->
-<div id="alertBanner" style="display:none;position:sticky;bottom:0;left:0;right:0;z-index:25;
-  margin:0 12px 8px;padding:10px 14px;border-radius:12px;
-  background:rgba(255,159,67,.12);border:1px solid rgba(255,159,67,.35);
-  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
-  align-items:center;gap:10px;animation:slideUp .3s var(--ease)">
-  <span id="alertText" style="flex:1;font-size:12.5px;font-weight:500;color:#FF9F43;line-height:1.4"></span>
-  <button onclick="this.parentElement.style.display='none'" style="font-size:11px;font-weight:600;
-    color:#FF9F43;background:rgba(255,159,67,.15);border:none;border-radius:7px;padding:4px 9px;cursor:pointer;flex-shrink:0">
-    OK
-  </button>
-</div>
+  <div id="alertBanner" style="display:none;position:sticky;bottom:0;left:0;right:0;z-index:25;
+    margin:0 12px 8px;padding:10px 14px;border-radius:12px;
+    background:rgba(255,159,67,.12);border:1px solid rgba(255,159,67,.35);
+    backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    align-items:center;gap:10px;animation:slideUp .3s var(--ease)">
+    <span id="alertText" style="flex:1;font-size:12.5px;font-weight:500;color:#FF9F43;line-height:1.4"></span>
+    <button onclick="this.parentElement.style.display='none'" style="font-size:11px;font-weight:600;
+      color:#FF9F43;background:rgba(255,159,67,.15);border:none;border-radius:7px;padding:4px 9px;cursor:pointer;flex-shrink:0">
+      OK
+    </button>
+  </div>
 
-<button class="fab" id="fabBtn" aria-label="Nueva tarea">
+  <!-- FAB -->
+  <button class="fab" id="fabBtn" aria-label="Nueva tarea">
     <svg viewBox="0 0 24 24" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
   </button>
-</div>
+
+</div><!-- /.app -->
 
 <!-- Sheet: Nueva/Editar tarea -->
 <div class="sheet-bg" id="taskSheet">
@@ -413,12 +401,7 @@ let curPrio = 'blue';
 
 
 
-// ── Status clock ──
-function tickClock(){
-  const n=new Date();
-  $('stTime').textContent=`${n.getHours()}:${p2(n.getMinutes())}`;
-}
-tickClock(); setInterval(tickClock,30000);
+
 
 // ── Render maestro ──
 function render(){
@@ -871,5 +854,6 @@ render();
   draw();
 })();
 </script>
+
 </body>
 </html>
