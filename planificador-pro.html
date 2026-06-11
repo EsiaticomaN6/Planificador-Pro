@@ -252,7 +252,7 @@ input:focus,select:focus,textarea:focus{outline:none}
 .cs-cancel{background:var(--bg2);color:var(--blue)}
 
 /* ───── Resumen header cards ───── */
-.summary{display:grid;grid-template-columns:repeat(5,1fr);gap:5px;padding:4px 12px 8px;overflow:visible}
+.summary{display:flex;flex-direction:column;gap:5px;padding:4px 12px 8px}
 .summary::-webkit-scrollbar{display:none}
 .sum-card{background:rgba(0,200,255,.06);border:1px solid rgba(0,200,255,.1);border-radius:10px;padding:7px 3px 6px;text-align:center;min-width:0;overflow:hidden}
 .sum-card .sc-val{font-size:16px;font-weight:700;letter-spacing:-.02em;line-height:1}
@@ -269,6 +269,16 @@ input:focus,select:focus,textarea:focus{outline:none}
 /* ───── Toast ───── */
 .toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--txt);color:var(--bg);font-size:13px;font-weight:500;padding:8px 16px;border-radius:999px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:99;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── Summary layout ── */
+.sum-row-top{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.sum-card-full{padding:10px 14px!important;min-width:0!important}
+.sc-full-inner{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.sc-full-val{font-size:22px!important;font-weight:700;letter-spacing:-.03em;line-height:1}
+.sc-prog-wrap{flex:1;display:flex;flex-direction:column;gap:5px}
+.sc-prog-bar{height:5px;background:rgba(0,200,255,.12);border-radius:3px;overflow:hidden}
+.sc-prog-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:3px;transition:width .5s var(--ease)}
+.sc-prog-label{font-size:11px;color:var(--txt4);font-weight:500}
 </style>
 </head>
 <body>
@@ -422,11 +432,24 @@ function renderSummary(){
   const overdue = tasks.filter(t=>diffDays(t.date,today)<0&&!t.done).length;
   const pct = total ? Math.round(done/total*100) : 0;
   $('summaryCards').innerHTML = `
-    <div class="sum-card"><div class="sc-val sc-blue">${total}</div><div class="sc-lbl">Total</div></div>
-    <div class="sum-card"><div class="sc-val sc-green">${done}</div><div class="sc-lbl">Hechas</div></div>
-    <div class="sum-card"><div class="sc-val sc-orange">${todayPend}</div><div class="sc-lbl">Para hoy</div></div>
-    <div class="sum-card"><div class="sc-val sc-red">${overdue}</div><div class="sc-lbl">Vencidas</div></div>
-    <div class="sum-card"><div class="sc-val">${pct}%</div><div class="sc-lbl">Completado</div></div>`;
+    <div class="sum-row-top">
+      <div class="sum-card"><div class="sc-val sc-blue">${total}</div><div class="sc-lbl">Total</div></div>
+      <div class="sum-card"><div class="sc-val sc-green">${done}</div><div class="sc-lbl">Hechas</div></div>
+      <div class="sum-card"><div class="sc-val sc-orange">${todayPend}</div><div class="sc-lbl">Para hoy</div></div>
+      <div class="sum-card"><div class="sc-val sc-red">${overdue}</div><div class="sc-lbl">Vencidas</div></div>
+    </div>
+    <div class="sum-card sum-card-full">
+      <div class="sc-full-inner">
+        <div>
+          <div class="sc-val sc-full-val">${pct}%</div>
+          <div class="sc-lbl">Completado</div>
+        </div>
+        <div class="sc-prog-wrap">
+          <div class="sc-prog-bar"><div class="sc-prog-fill" style="width:${pct}%"></div></div>
+          <span class="sc-prog-label">${done} de ${total} tareas</span>
+        </div>
+      </div>
+    </div>`;
   $('progFill').style.width = pct+'%';
 }
 
