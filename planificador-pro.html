@@ -394,8 +394,25 @@ const PRIO_COLORS={red:'#FF3B30',orange:'#FF9500',blue:'#007AFF',green:'#34C759'
 const PRIO_NAMES={red:'Alta',orange:'Media',green:'Baja',blue:'Normal',purple:'Especial'};
 
 // ── Estado ──
+// ── Persistencia localStorage ──
+function guardar(){
+  try{
+    localStorage.setItem('mp_tasks', JSON.stringify(tasks));
+    localStorage.setItem('mp_nextId', String(nextId));
+  }catch(e){}
+}
+function cargar(){
+  try{
+    const t = localStorage.getItem('mp_tasks');
+    const n = localStorage.getItem('mp_nextId');
+    if(t) tasks = JSON.parse(t);
+    if(n) nextId = parseInt(n,10);
+  }catch(e){}
+}
+
 let tasks = [];
 let nextId = 1;
+cargar(); // Cargar al inicio
 let view = 'day';
 let selDate = isoToday();
 let monthOffset = 0;
@@ -676,11 +693,13 @@ function toggleDone(id){
   const t=tasks.find(x=>x.id===id);
   if(!t) return;
   t.done=!t.done;
+  guardar();
   showToast(t.done?'Tarea completada ✓':'Marcada como pendiente');
   render();
 }
 function deleteTask(id){
   tasks=tasks.filter(x=>x.id!==id);
+  guardar();
   showToast('Tarea eliminada');
   render();
 }
@@ -727,6 +746,7 @@ $('saveBtn').addEventListener('click',()=>{
     tasks.push({id:nextId++,title,desc:$('fDesc').value.trim(),date,prio:curPrio,done:false});
     showToast('Tarea agregada');
   }
+  guardar();
   closeSheet('taskSheet');
   render();
 });
