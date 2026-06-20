@@ -276,6 +276,17 @@ html{height:-webkit-fill-available}
 body{min-height:-webkit-fill-available}
 input,textarea,select{font-size:16px!important;-webkit-text-size-adjust:100%}
 .sheet-bg.open{display:flex!important}
+
+/* Tarjetas de resumen clicables */
+.sum-clickable{cursor:pointer;transition:transform .12s var(--ease),border-color .15s var(--ease),background .15s var(--ease);width:100%}
+.sum-clickable:active{transform:scale(.95)}
+.sum-clickable.sum-active{border-color:rgba(0,200,255,.5);background:rgba(0,200,255,.14)}
+.sum-filter-list{margin-top:8px;background:rgba(8,8,12,.7);border:1px solid rgba(0,200,255,.12);border-radius:var(--r-sm);padding:10px 12px;animation:slideUp .25s var(--ease)}
+.sfl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px}
+.sfl-head span{font-size:13px;font-weight:600;color:var(--txt2)}
+.sfl-close{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.08);color:var(--txt4);font-size:11px;display:flex;align-items:center;justify-content:center}
+.sfl-empty{font-size:12.5px;color:var(--txt4);padding:14px 4px;text-align:center}
+.sfl-items{display:flex;flex-direction:column;gap:0;max-height:280px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 </style>
 </head>
 <body>
@@ -310,7 +321,7 @@ input,textarea,select{font-size:16px!important;-webkit-text-size-adjust:100%}
     backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
     align-items:center;gap:10px;animation:slideUp .3s var(--ease)">
     <span id="alertText" style="flex:1;font-size:12.5px;font-weight:500;color:#FF9F43;line-height:1.4"></span>
-    <button onclick="this.parentElement.style.display='none'" style="font-size:11px;font-weight:600;
+    <button onclick="this.parentElement.style.display='none';this.parentElement.dataset.dismissed='1'" style="font-size:11px;font-weight:600;
       color:#FF9F43;background:rgba(255,159,67,.15);border:none;border-radius:7px;padding:4px 9px;cursor:pointer;flex-shrink:0">
       OK
     </button>
@@ -417,6 +428,7 @@ cargar(); // Cargar al inicio
 let view = 'day';
 let selDate = isoToday();
 let monthOffset = 0;
+let sumFilter = null; // 'total' | 'done' | 'today' | 'overdue' | null
 let editId = null;
 let deleteId = null;
 let curPrio = 'green';
@@ -445,10 +457,10 @@ function renderSummary(){
   const pct = total ? Math.round(done/total*100) : 0;
   $('summaryCards').innerHTML = `
     <div class="sum-row-top">
-      <div class="sum-card"><div class="sc-val sc-blue">${total}</div><div class="sc-lbl">Total</div></div>
-      <div class="sum-card"><div class="sc-val sc-green">${done}</div><div class="sc-lbl">Hechas</div></div>
-      <div class="sum-card"><div class="sc-val sc-orange">${todayPend}</div><div class="sc-lbl">Para hoy</div></div>
-      <div class="sum-card"><div class="sc-val sc-red">${overdue}</div><div class="sc-lbl">Vencidas</div></div>
+      <button class="sum-card sum-clickable${sumFilter==='total'?' sum-active':''}" data-sumf="total"><div class="sc-val sc-blue">${total}</div><div class="sc-lbl">Total</div></button>
+      <button class="sum-card sum-clickable${sumFilter==='done'?' sum-active':''}" data-sumf="done"><div class="sc-val sc-green">${done}</div><div class="sc-lbl">Hechas</div></button>
+      <button class="sum-card sum-clickable${sumFilter==='today'?' sum-active':''}" data-sumf="today"><div class="sc-val sc-orange">${todayPend}</div><div class="sc-lbl">Para hoy</div></button>
+      <button class="sum-card sum-clickable${sumFilter==='overdue'?' sum-active':''}" data-sumf="overdue"><div class="sc-val sc-red">${overdue}</div><div class="sc-lbl">Vencidas</div></button>
     </div>
     <div class="sum-card sum-card-full">
       <div class="sc-full-inner">
@@ -461,8 +473,46 @@ function renderSummary(){
           <span class="sc-prog-label">${done} de ${total} tareas</span>
         </div>
       </div>
-    </div>`;
+    </div>
+    ${sumFilter ? `<div class="sum-filter-list" id="sumFilterList"></div>` : ''}`;
   $('progFill').style.width = pct+'%';
+
+  // Adjuntar listeners a las tarjetas clicables
+  qsa('.sum-clickable').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const f = btn.dataset.sumf;
+      sumFilter = (sumFilter===f) ? null : f;
+      renderSummary();
+    });
+  });
+
+  // Renderizar la lista de tareas filtradas si hay un filtro activo
+  if(sumFilter){
+    const listEl = $('sumFilterList');
+    if(listEl){
+      let filtered = [];
+      let label = '';
+      if(sumFilter==='total'){ filtered = tasks; label='Todas las tareas'; }
+      else if(sumFilter==='done'){ filtered = tasks.filter(t=>t.done); label='Tareas completadas'; }
+      else if(sumFilter==='today'){ filtered = tasks.filter(t=>t.date===today&&!t.done); label='Para hoy'; }
+      else if(sumFilter==='overdue'){ filtered = tasks.filter(t=>diffDays(t.date,today)<0&&!t.done); label='Tareas vencidas'; }
+      filtered.sort((a,b)=>PRIO_RANK(a.prio)-PRIO_RANK(b.prio));
+      listEl.innerHTML = `<div class="sfl-head"><span>${label}</span><button class="sfl-close" id="sflClose">✕</button></div>`;
+      if(!filtered.length){
+        listEl.innerHTML += `<div class="sfl-empty">No hay tareas en esta categoría.</div>`;
+      } else {
+        const wrap = document.createElement('div');
+        wrap.className = 'sfl-items';
+        filtered.forEach(t=>{
+          const overdueFlag = diffDays(t.date, today) < 0 && !t.done;
+          wrap.appendChild(makeCard(t, overdueFlag));
+        });
+        listEl.appendChild(wrap);
+      }
+      const closeBtn = $('sflClose');
+      if(closeBtn) closeBtn.addEventListener('click', ()=>{ sumFilter=null; renderSummary(); });
+    }
+  }
 }
 
 // ── Header dinámico ──
@@ -796,42 +846,111 @@ function showToast(msg){
   toastTimer=setTimeout(()=>t.classList.remove('show'),1800);
 }
 
-// ── Notificaciones 1 día antes ──────────────────────────────
+// ── Notificaciones de tareas por vencer ─────────────────────
 function solicitarPermiso(){
   if(!('Notification' in window)) return;
   if(Notification.permission === 'default'){
-    Notification.requestPermission();
+    Notification.requestPermission().then(() => {
+      checkAlertas();
+    });
+  }
+}
+
+function yaNotificadaHoy(clave){
+  const reg = localStorage.getItem('mp_notif_log') || '{}';
+  let log;
+  try{ log = JSON.parse(reg); }catch(e){ log = {}; }
+  return log[clave] === isoToday();
+}
+function marcarNotificada(clave){
+  const reg = localStorage.getItem('mp_notif_log') || '{}';
+  let log;
+  try{ log = JSON.parse(reg); }catch(e){ log = {}; }
+  log[clave] = isoToday();
+  localStorage.setItem('mp_notif_log', JSON.stringify(log));
+}
+
+function lanzarNotificacion(titulo, cuerpo, tag){
+  const iconUrl = document.querySelector('link[rel="apple-touch-icon"]')?.href || '';
+  if('serviceWorker' in navigator && navigator.serviceWorker.controller){
+    navigator.serviceWorker.ready.then(reg=>{
+      reg.showNotification(titulo, { body: cuerpo, icon: iconUrl, badge: iconUrl, tag, renotify:true });
+    });
+  } else if('Notification' in window && Notification.permission==='granted'){
+    const n = new Notification(titulo, { body: cuerpo, icon: iconUrl, tag });
+    setTimeout(()=>n.close(), 9000);
   }
 }
 
 function checkAlertas(){
   if(!('Notification' in window) || Notification.permission !== 'granted') return;
-  const manana = addDays(isoToday(), 1);
-  const pendientes = tasks.filter(t => t.date === manana && !t.done);
-  if(!pendientes.length) return;
-  const nombres = pendientes.map(t => t.title).join(', ');
-  const n = new Notification('📋 Mi Planificador — Mañana vence', {
-    body: `Tienes ${pendientes.length} tarea${pendientes.length>1?'s':''} para mañana: ${nombres}`,
-    icon: document.querySelector('link[rel="apple-touch-icon"]')?.href || '',
-    badge: document.querySelector('link[rel="icon"]')?.href || '',
-    tag: 'miplanner-alert',
-    renotify: false,
-  });
-  setTimeout(() => n.close(), 8000);
+  const today = isoToday();
+  const manana = addDays(today, 1);
+
+  // 1) Tareas que vencen MAÑANA
+  const pendientesManana = tasks.filter(t => t.date === manana && !t.done);
+  if(pendientesManana.length && !yaNotificadaHoy('manana_'+manana)){
+    const nombres = pendientesManana.slice(0,3).map(t=>t.title).join(', ');
+    lanzarNotificacion(
+      '📋 Mi Planificador',
+      `Mañana vence${pendientesManana.length>1?'n':''}: ${nombres}${pendientesManana.length>3?'…':''}`,
+      'mp-manana'
+    );
+    marcarNotificada('manana_'+manana);
+  }
+
+  // 2) Tareas que vencen HOY (recordatorio del mismo día)
+  const pendientesHoy = tasks.filter(t => t.date === today && !t.done);
+  if(pendientesHoy.length && !yaNotificadaHoy('hoy_'+today)){
+    const nombres = pendientesHoy.slice(0,3).map(t=>t.title).join(', ');
+    lanzarNotificacion(
+      '⏰ Mi Planificador — Hoy',
+      `Vence${pendientesHoy.length>1?'n':''} hoy: ${nombres}${pendientesHoy.length>3?'…':''}`,
+      'mp-hoy'
+    );
+    marcarNotificada('hoy_'+today);
+  }
+
+  // 3) Tareas vencidas (alerta de seguimiento)
+  const vencidas = tasks.filter(t => diffDays(t.date, today) < 0 && !t.done);
+  if(vencidas.length && !yaNotificadaHoy('vencidas_'+today)){
+    lanzarNotificacion(
+      '🔴 Mi Planificador',
+      `Tienes ${vencidas.length} tarea${vencidas.length>1?'s':''} vencida${vencidas.length>1?'s':''} sin completar`,
+      'mp-vencidas'
+    );
+    marcarNotificada('vencidas_'+today);
+  }
 }
 
-// Banner in-app de aviso (para cuando no hay permisos de notificación push)
+// Banner in-app de aviso (visible siempre, complementa las notificaciones push)
 function checkAlertaInApp(){
-  const manana = addDays(isoToday(), 1);
-  const pendientes = tasks.filter(t => t.date === manana && !t.done);
+  const today = isoToday();
+  const manana = addDays(today, 1);
   const banner = $('alertBanner');
   if(!banner) return;
-  if(pendientes.length){
-    const nombres = pendientes.slice(0,2).map(t=>t.title).join(', ') + (pendientes.length>2 ? ` y ${pendientes.length-2} más` : '');
-    $('alertText').textContent = `⏰ Mañana vence${pendientes.length>1?'n':''}: ${nombres}`;
+
+  const vencidas = tasks.filter(t => diffDays(t.date, today) < 0 && !t.done);
+  const hoy = tasks.filter(t => t.date === today && !t.done);
+  const mananaPend = tasks.filter(t => t.date === manana && !t.done);
+
+  let msg = '';
+  if(vencidas.length){
+    msg = `🔴 ${vencidas.length} tarea${vencidas.length>1?'s':''} vencida${vencidas.length>1?'s':''}`;
+  } else if(hoy.length){
+    const nombres = hoy.slice(0,2).map(t=>t.title).join(', ') + (hoy.length>2?` y ${hoy.length-2} más`:'');
+    msg = `⏰ Vence hoy: ${nombres}`;
+  } else if(mananaPend.length){
+    const nombres = mananaPend.slice(0,2).map(t=>t.title).join(', ') + (mananaPend.length>2?` y ${mananaPend.length-2} más`:'');
+    msg = `📋 Mañana vence${mananaPend.length>1?'n':''}: ${nombres}`;
+  }
+
+  if(msg && !banner.dataset.dismissed){
+    $('alertText').textContent = msg;
     banner.style.display = 'flex';
-  } else {
+  } else if(!msg){
     banner.style.display = 'none';
+    banner.dataset.dismissed = '';
   }
 }
 
@@ -840,7 +959,8 @@ solicitarPermiso();
 // Check alertas push al cargar (si ya tiene permiso)
 setTimeout(checkAlertas, 1500);
 // Check diario
-setInterval(checkAlertas, 3600000);
+setInterval(checkAlertas, 900000); // cada 15 minutos
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) checkAlertas(); });
 render();
 </script>
 <canvas id="circuit" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.35"></canvas>
