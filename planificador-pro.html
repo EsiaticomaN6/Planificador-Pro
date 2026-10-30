@@ -291,6 +291,11 @@ input,textarea,select{font-size:16px!important;-webkit-text-size-adjust:100%}
 .tc-act.cal:hover svg{stroke:var(--blue)}
 .tc-act.cal.on{background:var(--green-bg)}
 .tc-act.cal.on svg{stroke:var(--green)}
+.cal-hint{flex:1;font-size:13px;color:var(--txt4);text-align:right}
+.ios-switch{-webkit-appearance:none;appearance:none;width:51px;height:31px;border-radius:16px;background:var(--bg4);position:relative;flex-shrink:0;transition:background .2s var(--ease);cursor:pointer}
+.ios-switch::after{content:'';position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.3);transition:transform .2s var(--ease)}
+.ios-switch:checked{background:#34C759}
+.ios-switch:checked::after{transform:translateX(20px)}
 </style>
 </head>
 <body>
@@ -361,6 +366,11 @@ input,textarea,select{font-size:16px!important;-webkit-text-size-adjust:100%}
         <div class="form-row">
           <label for="fFecha">Fecha</label>
           <input type="date" id="fFecha">
+        </div>
+        <div class="form-row" id="fCalRow">
+          <label for="fAutoCal">Calendario</label>
+          <span class="cal-hint">Añadir con alarmas</span>
+          <input type="checkbox" id="fAutoCal" class="ios-switch" checked>
         </div>
         <div class="form-row">
           <label style="align-self:flex-start;padding-top:6px">Prioridad</label>
@@ -776,12 +786,19 @@ function addToCalendar(id){
     'END:VEVENT','END:VCALENDAR'
   ];
   const ics = lines.join('\r\n');
-  const blob = new Blob([ics],{type:'text/calendar;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
+  const esIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1);
   const a = document.createElement('a');
-  a.href = url; a.download = 'tarea.ics';
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  if(esIOS){
+    // iOS abre directamente la hoja "Añadir a Calendario"
+    a.href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+    document.body.appendChild(a); a.click(); a.remove();
+  } else {
+    const blob = new Blob([ics],{type:'text/calendar;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    a.href = url; a.download = 'tarea.ics';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  }
   t.inCal = true;
   guardar();
   render();
@@ -808,6 +825,8 @@ function deleteTask(id){
 function openNew(){
   editId=null;
   $('sheetTitle').textContent='Nueva tarea';
+  $('fCalRow').style.display='flex';
+  try{ $('fAutoCal').checked = localStorage.getItem('mp_autocal')!=='0'; }catch(e){}
   $('saveBtn').textContent='Agregar tarea';
   $('fTitulo').value='';
   $('fDesc').value='';
@@ -821,6 +840,7 @@ function openEdit(id){
   if(!t) return;
   editId=id;
   $('sheetTitle').textContent='Editar tarea';
+  $('fCalRow').style.display='none';
   $('saveBtn').textContent='Guardar cambios';
   $('fTitulo').value=t.title;
   $('fDesc').value=t.desc;
@@ -833,22 +853,26 @@ function setPrio(p){
   qsa('.prio-btn').forEach(b=>{ b.classList.toggle('sel',b.dataset.prio===p); b.setAttribute('aria-pressed',b.dataset.prio===p); });
 }
 qsa('.prio-btn').forEach(b=>b.addEventListener('click',()=>setPrio(b.dataset.prio)));
+$('fAutoCal').addEventListener('change',()=>{ try{ localStorage.setItem('mp_autocal', $('fAutoCal').checked?'1':'0'); }catch(e){} });
 $('saveBtn').addEventListener('click',()=>{
   const title=$('fTitulo').value.trim();
   const date=$('fFecha').value;
   if(!title){ showToast('Escribe un título'); $('fTitulo').focus(); return; }
   if(!date){ showToast('Elige una fecha'); $('fFecha').focus(); return; }
+  let newId = null;
   if(editId){
     const t=tasks.find(x=>x.id===editId);
     if(t){ if(t.date!==date) t.inCal=false; t.title=title; t.desc=$('fDesc').value.trim(); t.date=date; t.prio=curPrio; }
     showToast('Cambios guardados');
   } else {
+    newId = nextId;
     tasks.push({id:nextId++,title,desc:$('fDesc').value.trim(),date,prio:curPrio,done:false});
     showToast('Tarea agregada');
   }
   guardar();
   closeSheet('taskSheet');
   render();
+  if(newId!==null && $('fAutoCal').checked) addToCalendar(newId);
 });
 $('sheetClose').addEventListener('click',()=>closeSheet('taskSheet'));
 $('fabBtn').addEventListener('click',openNew);
