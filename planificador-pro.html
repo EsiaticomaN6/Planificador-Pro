@@ -287,6 +287,10 @@ input,textarea,select{font-size:16px!important;-webkit-text-size-adjust:100%}
 .sfl-close{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.08);color:var(--txt4);font-size:11px;display:flex;align-items:center;justify-content:center}
 .sfl-empty{font-size:12.5px;color:var(--txt4);padding:14px 4px;text-align:center}
 .sfl-items{display:flex;flex-direction:column;gap:0;max-height:280px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.tc-act.cal:hover{background:var(--blue-bg)}
+.tc-act.cal:hover svg{stroke:var(--blue)}
+.tc-act.cal.on{background:var(--green-bg)}
+.tc-act.cal.on svg{stroke:var(--green)}
 </style>
 </head>
 <body>
@@ -425,6 +429,8 @@ function cargar(){
 let tasks = [];
 let nextId = 1;
 cargar(); // Cargar al inicio
+// Pedir almacenamiento persistente para que iOS no borre los datos
+try{ if(navigator.storage && navigator.storage.persist) navigator.storage.persist(); }catch(e){}
 let view = 'day';
 let selDate = isoToday();
 let monthOffset = 0;
@@ -720,6 +726,7 @@ function makeCard(t, isOverdue){
         </div>
       </div>
       <div class="tc-actions">
+        <button class="tc-act cal${t.inCal?' on':''}" aria-label="${t.inCal?'Ya añadida al calendario, tocar para reenviar':'Añadir al calendario con alarma'}" title="${t.inCal?'En calendario':'Añadir al calendario'}"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></button>
         <button class="tc-act edit" aria-label="Editar"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
         <button class="tc-act del" aria-label="Eliminar"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
       </div>
@@ -727,6 +734,7 @@ function makeCard(t, isOverdue){
   el.querySelector('.tc-title').textContent=t.title;
   if(t.desc) el.querySelector('.tc-desc').textContent=t.desc;
   el.querySelector('.tc-check').addEventListener('click',e=>{ e.stopPropagation(); toggleDone(t.id); });
+  el.querySelector('.cal').addEventListener('click',e=>{ e.stopPropagation(); addToCalendar(t.id); });
   el.querySelector('.edit').addEventListener('click',e=>{ e.stopPropagation(); openEdit(t.id); });
   el.querySelector('.del').addEventListener('click',e=>{ e.stopPropagation(); openConfirm(t.id,t.title); });
   return el;
@@ -737,6 +745,47 @@ function emptyHTML(title,sub){
     <div class="empty-icon"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4m0 4h.01"/></svg></div>
     <h3>${title}</h3><p>${sub}</p>
   </div>`;
+}
+
+
+// ── Añadir al Calendario del iPhone (.ics con alarmas) ──
+function icsEsc(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/;/g,'\\;').replace(/,/g,'\\,').replace(/\r?\n/g,'\\n'); }
+function addToCalendar(id){
+  const t = tasks.find(x=>x.id===id);
+  if(!t) return;
+  const d = t.date.replace(/-/g,'');
+  const fin = addDays(t.date,1).replace(/-/g,'');
+  const now = new Date();
+  const stamp = now.getUTCFullYear()+p2(now.getUTCMonth()+1)+p2(now.getUTCDate())+'T'+p2(now.getUTCHours())+p2(now.getUTCMinutes())+p2(now.getUTCSeconds())+'Z';
+  const prio = {red:'Alta',orange:'Media',green:'Baja'}[t.prio] || '';
+  const desc = (t.desc ? t.desc+'\n' : '') + (prio ? 'Prioridad: '+prio : '');
+  const alarma = (trigger, texto) => [
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+icsEsc(texto),'TRIGGER;RELATED=START:'+trigger,'END:VALARM'
+  ];
+  const lines = [
+    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Mi Planificador//ES','CALSCALE:GREGORIAN','METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    'UID:mp-'+t.id+'-'+Date.now()+'@miplanificador',
+    'DTSTAMP:'+stamp,
+    'DTSTART;VALUE=DATE:'+d,
+    'DTEND;VALUE=DATE:'+fin,
+    'SUMMARY:'+icsEsc(t.title),
+    'DESCRIPTION:'+icsEsc(desc),
+    ...alarma('-PT15H','Mañana vence: '+t.title),   // víspera 9:00 am
+    ...alarma('PT9H','Hoy vence: '+t.title),        // mismo día 9:00 am
+    'END:VEVENT','END:VCALENDAR'
+  ];
+  const ics = lines.join('\r\n');
+  const blob = new Blob([ics],{type:'text/calendar;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'tarea.ics';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+  t.inCal = true;
+  guardar();
+  render();
+  showToast('Abriendo Calendario…');
 }
 
 // ── Acciones ──
@@ -791,7 +840,7 @@ $('saveBtn').addEventListener('click',()=>{
   if(!date){ showToast('Elige una fecha'); $('fFecha').focus(); return; }
   if(editId){
     const t=tasks.find(x=>x.id===editId);
-    if(t){ t.title=title; t.desc=$('fDesc').value.trim(); t.date=date; t.prio=curPrio; }
+    if(t){ if(t.date!==date) t.inCal=false; t.title=title; t.desc=$('fDesc').value.trim(); t.date=date; t.prio=curPrio; }
     showToast('Cambios guardados');
   } else {
     tasks.push({id:nextId++,title,desc:$('fDesc').value.trim(),date,prio:curPrio,done:false});
